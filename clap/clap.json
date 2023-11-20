@@ -20,5 +20,13 @@
             "type": "-",
             "count": 1
         }
+    },
+    "settings": {
+        "match-args": false,
+        "match--args": false,
+        "match_command_args": false,
+        "match_algorithm": "normal",
+        "unmatched_args_to_data": false,
+        "default_count": 0
     }
 }

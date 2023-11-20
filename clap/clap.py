@@ -1,7 +1,6 @@
 import sys
 import json
 from typing import List
-from typing import Dict
 
 
 def IsKnown(name: str, config: dict) -> bool:
@@ -13,22 +12,28 @@ def IsKnown(name: str, config: dict) -> bool:
     return True
 
 
-def IsDefaultSet(setting: str, config: dict) -> bool:
-    if "default" in config:
-        if setting in config["default"]:
+def IsSettingSet(setting: str, config: dict) -> bool:
+    if "settings" in config:
+        if setting in config["settings"]:
             return True
     return False
+
+
+def GetSetting(setting: str, default: any, config: dict) -> any:
+    if IsSettingSet(setting, config):
+        return config["settings"][setting]
+    else:
+        return default
 
 
 def GetArgType(arg: str) -> str:
     dash_count = arg.count("-")
     arg_type = ""
-    if dash_count == 2:
+    if arg[1] == "-":
         arg_type = "--"
     elif dash_count == 1:
         arg_type = "-"
-
-    elif dash_count > 2:
+    elif dash_count > 0:
         arg_type = "---"
     else:
         arg_type = "command"
@@ -45,8 +50,8 @@ def InferrParameters(arg: str, config: dict) -> dict:
     arg_type = GetArgType(arg)
 
     arg_count = 0
-    if IsDefaultSet("count", config):
-        arg_count = config["default"]["count"]
+    if IsSettingSet("default_count", config):
+        arg_count = config["settings"]["default_count"]
 
     return {"name": arg_name, "type": arg_type, "count": arg_count, "inferred": True}
 
@@ -62,6 +67,9 @@ def FindParameters(arg: str, config: dict) -> dict:
 
 
 def GetVal(val: str) -> dict:
+    if val.lstrip('-').isdigit():
+        return {"type": "number", "val": val}
+
     return {"type": "string", "val": val}
 
 
@@ -87,22 +95,99 @@ def FindArgs(arg_index: int, arguments: List[str], config: dict) -> dict:
 
     for i in range(0, len(arg["args"])):
         if "count" in arg["args"][i]:
+            print(count)
             count += arg["args"][i]["count"]
 
     arg["count"] = count
+
+    if parameters["inferred"]:
+        arg["known"] = False
+    else:
+        arg["known"] = True
+
     return arg
 
 
-def Parse(config_filename: str) -> List[dict]:
-    file = open(config_filename, "r")
-    config = json.load(file)
-    file.close()
+def SplitSegments(segments: str) -> List[str]:
+    arg_type = GetArgType(segments)
+    if not arg_type == "---":
+        return [segments]
 
-    arguments = sys.argv
+    cur = segments.find("-", 0)
+
+    split = []
+    print(cur)
+
+    while not cur == -1:
+        next = segments.find("-", cur + 2)
+
+        if next == -1:
+            print(segments[cur:len(segments)])
+            split.append(segments[cur:len(segments)])
+        else:
+            print(segments[cur:next])
+            split.append(segments[cur:next])
+
+        cur = next
+
+    print(split)
+    return split
+
+
+def Match(arg: str, type: str, config: dict) -> List[str]:
+    raise Exception("Match() is not implemented!")
+
+
+def SplitArguments(arg: str, config: dict) -> List[str]:
+    arg_type = GetArgType(arg)
+
+    if arg_type == "-":
+        do_match = GetSetting("match-args", False, config)
+
+        if do_match:
+            return Match(arg, arg_type, config)
+        else:
+            arg_name = GetArgName(arg)
+            args = []
+
+            for char in arg_name:
+                args.append("-" + char)
+
+            return args
+    elif arg_type == "--":
+        do_match = GetSetting("match--args", False, config)
+
+        if do_match:
+            return Match(arg, arg_type, config)
+        else:
+            return [arg]
+    elif arg_type == "command":
+        do_match = GetSetting("match_command_args", False, config)
+
+        if do_match:
+            return Match(arg, arg_type, config)
+        else:
+            return [arg]
+
+
+def ProcessArguments(arguments: List[str], config: dict) -> List[str]:
     arguments.pop(0)
 
-    parsed = []
+    new_arguments = []
+    for argument in arguments:
+        new_arguments += SplitSegments(argument)
+    arguments = new_arguments
+    new_arguments = []
 
+    for argument in arguments:
+        new_arguments += SplitArguments(argument, config)
+    return new_arguments
+
+
+def Parse(config: dict) -> List[dict]:
+    arguments = ProcessArguments(sys.argv, config)
+
+    parsed = []
     next = 0
 
     while True:
@@ -116,6 +201,3 @@ def Parse(config_filename: str) -> List[dict]:
         next += parsed[len(parsed) - 1]["count"] + 1
 
     return parsed
-
-
-print(Parse("clap.json"))

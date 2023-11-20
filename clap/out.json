@@ -1,0 +1,58 @@
+[
+    {
+        "name": "a",
+        "type": "-",
+        "args": [
+            {
+                "type": "number",
+                "val": "10"
+            },
+            {
+                "type": "number",
+                "val": "10"
+            }
+        ],
+        "count": 2,
+        "known": true
+    },
+    {
+        "name": "h",
+        "type": "-",
+        "args": [],
+        "count": 0,
+        "known": true
+    },
+    {
+        "name": "e",
+        "type": "-",
+        "args": [],
+        "count": 0,
+        "known": false
+    },
+    {
+        "name": "l",
+        "type": "-",
+        "args": [],
+        "count": 0,
+        "known": false
+    },
+    {
+        "name": "p",
+        "type": "-",
+        "args": [
+            {
+                "type": "string",
+                "val": "owo"
+            }
+        ],
+        "count": 1,
+        "known": true
+    },
+    {
+        "name": "amogus",
+        "type": "command",
+        "args": [],
+        "count": 0,
+        "known": false
+    }
+]
