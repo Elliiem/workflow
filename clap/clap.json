@@ -1,0 +1,24 @@
+{
+    "arguments": {
+        "a": {
+            "type": "-",
+            "count": 2
+        },
+        "add": {
+            "type": "command",
+            "count": 2
+        },
+        "h": {
+            "type": "-",
+            "count": 0
+        },
+        "help": {
+            "type": "--",
+            "count": 0
+        },
+        "p": {
+            "type": "-",
+            "count": 1
+        }
+    }
+}
