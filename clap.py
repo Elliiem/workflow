@@ -3,13 +3,28 @@ import json
 from typing import List
 
 
+def IsSameType(name: str, arg: str, config: dict) -> bool:
+    arg_type = GetArgType(arg)
+
+    if not IsKnown(name, config):
+        print("false")
+        return False
+
+    return arg_type == config["arguments"][name]["type"]
+
+
 def IsKnown(name: str, config: dict) -> bool:
     if "arguments" in config:
         if not name in config["arguments"]:
             return False
+        else:
+            return True
     else:
         return False
-    return True
+
+
+def IsValue(obj: dict):
+    return "val" in obj
 
 
 def IsSettingSet(setting: str, config: dict) -> bool:
@@ -26,19 +41,27 @@ def GetSetting(setting: str, default: any, config: dict) -> any:
         return default
 
 
+def GetVal(val: str) -> dict:
+    if val.lstrip('-').isdigit():
+        return {"type": "number", "val": val}
+
+    return {"type": "string", "val": val}
+
+
 def GetArgType(arg: str) -> str:
     dash_count = arg.count("-")
-    arg_type = ""
-    if arg[1] == "-":
-        arg_type = "--"
-    elif dash_count == 1:
-        arg_type = "-"
-    elif dash_count > 0:
-        arg_type = "---"
-    else:
-        arg_type = "command"
 
-    return arg_type
+    if len(arg) <= 1:
+        return "command"
+
+    if arg[1] == "-":
+        return "--"
+    elif dash_count == 1:
+        return "-"
+    elif dash_count > 0:
+        return "---"
+    else:
+        return "command"
 
 
 def GetArgName(arg: str) -> str:
@@ -48,6 +71,9 @@ def GetArgName(arg: str) -> str:
 def InferrParameters(arg: str, config: dict) -> dict:
     arg_name = GetArgName(arg)
     arg_type = GetArgType(arg)
+
+    if arg_type == "command":
+        return GetVal(arg)
 
     arg_count = 0
     if IsSettingSet("default_count", config):
@@ -59,24 +85,21 @@ def InferrParameters(arg: str, config: dict) -> dict:
 def FindParameters(arg: str, config: dict) -> dict:
     name = arg.replace("-", "")
 
-    if not IsKnown(name, config):
+    if not IsSameType(name, arg, config) or not IsKnown(name, config):
         return InferrParameters(arg, config)
 
     return {"name": name, "type": config["arguments"][name]["type"],
             "count": config["arguments"][name]["count"], "inferred": False}
 
 
-def GetVal(val: str) -> dict:
-    if val.lstrip('-').isdigit():
-        return {"type": "number", "val": val}
-
-    return {"type": "string", "val": val}
-
-
 def FindArgs(arg_index: int, arguments: List[str], config: dict) -> dict:
     if arg_index >= len(arguments):
         return {}
+
     parameters = FindParameters(arguments[arg_index], config)
+
+    if IsValue(parameters):
+        return parameters
 
     arg = {"name": GetArgName(
         arguments[arg_index]), "type": GetArgType(arguments[arg_index]), "args": []}
@@ -110,28 +133,27 @@ def FindArgs(arg_index: int, arguments: List[str], config: dict) -> dict:
 
 def SplitSegments(segments: str) -> List[str]:
     arg_type = GetArgType(segments)
+
     if not arg_type == "---":
         return [segments]
 
     cur = segments.find("-", 0)
 
-    split = []
-    print(cur)
+    split_segments = []
 
     while not cur == -1:
         next = segments.find("-", cur + 2)
 
         if next == -1:
             print(segments[cur:len(segments)])
-            split.append(segments[cur:len(segments)])
+            split_segments.append(segments[cur:len(segments)])
         else:
             print(segments[cur:next])
-            split.append(segments[cur:next])
+            split_segments.append(segments[cur:next])
 
         cur = next
 
-    print(split)
-    return split
+    return split_segments
 
 
 def Match(arg: str, type: str, config: dict) -> List[str]:
@@ -198,6 +220,12 @@ def Parse(config: dict) -> List[dict]:
 
         parsed.append(args)
 
-        next += parsed[len(parsed) - 1]["count"] + 1
+        if "val" in args:
+            next += 1
+        else:
+            next += parsed[len(parsed) - 1]["count"] + 1
 
     return parsed
+
+
+print(Parse({}))
