@@ -16,7 +16,7 @@ def IsKnown(arg: str, config: dict) -> bool:
         return False
 
 
-def IsValue(obj: dict):
+def IsValue(obj: dict) -> bool:
     return "val" in obj
 
 
@@ -152,73 +152,73 @@ def ListArgumentsofType(type: str, config: dict) -> List[str]:
     return ret
 
 
-def MatchSingle(arg_seg_name: str, config: dict) -> List[str]:
+def MatchSingle(name: str, config: dict) -> List[str]:
     ret = []
 
-    while IsKnown("-" + arg_seg_name[0], config):
-        ret.append("-" + arg_seg_name[0])
-        arg_seg_name = arg_seg_name[1:len(arg_seg_name)]
-        if len(arg_seg_name) == 0:
+    while IsKnown("-" + name[0], config):
+        ret.append("-" + name[0])
+        name = name[1:len(name)]
+        if len(name) == 0:
             break
 
-    if GetSetting("unknown_to_data", False, config) and len(arg_seg_name) > 0:
-        if not len(arg_seg_name) == 0:
-            ret.append(arg_seg_name)
-    elif len(arg_seg_name) > 0:
-        for char in arg_seg_name:
+    if GetSetting("unknown_to_data", False, config) and len(name) > 0:
+        if not len(name) == 0:
+            ret.append(name)
+    elif len(name) > 0:
+        for char in name:
             ret.append("-" + char)
 
     return ret
 
 
-def MatchDouble(arg_seg_name: str, config: dict) -> List[str]:
+def MatchDouble(name: str, config: dict) -> List[str]:
     ret = []
 
     arguments = ListArgumentsofType("--", config)
 
     found = True
-    while len(arg_seg_name) > 0 and found:
+    while len(name) > 0 and found:
         found = False
 
         for key in arguments:
-            if len(key) > len(arg_seg_name):
+            if len(key) > len(name):
                 continue
 
-            if arg_seg_name[0:len(key)] == key:
-                ret.append("--" + arg_seg_name[0:len(key)])
-                arg_seg_name = arg_seg_name[len(key):len(arg_seg_name)]
+            if name[0:len(key)] == key:
+                ret.append("--" + name[0:len(key)])
+                name = name[len(key):len(name)]
                 found = True
                 break
 
-    if len(arg_seg_name) > 0 and GetSetting("unknown_to_data", False, config):
-        ret.append(arg_seg_name)
-    elif len(arg_seg_name) > 0:
-        ret.append("--" + arg_seg_name)
+    if len(name) > 0 and GetSetting("unknown_to_data", False, config):
+        ret.append(name)
+    elif len(name) > 0:
+        ret.append("--" + name)
 
     return ret
 
 
-def MatchCommand(arg_seg_name: str, config: dict) -> List[str]:
+def MatchCommand(name: str, config: dict) -> List[str]:
     ret = []
 
-    arguments = ListArgumentsofType("--", config)
+    arguments = ListArgumentsofType("command", config)
 
     found = True
-    while len(arg_seg_name) > 0 and found:
+    while len(name) > 0 and found:
         found = False
 
         for key in arguments:
-            if len(key) > len(arg_seg_name):
+            if len(key) > len(name):
                 continue
 
-            if arg_seg_name[0:len(key)] == key:
-                ret.append(arg_seg_name[0:len(key)])
-                arg_seg_name = arg_seg_name[len(key):len(arg_seg_name)]
+            if name[0:len(key)] == key:
+                ret.append(name[0:len(key)])
+                name = name[len(key):len(name)]
                 found = True
                 break
 
-    if len(arg_seg_name) > 0:
-        ret.append(arg_seg_name)
+    if len(name) > 0:
+        ret.append(name)
 
     return ret
 
@@ -295,6 +295,3 @@ def Parse(config: dict) -> List[dict]:
             next += parsed[-1]["count"] + 1
 
     return parsed
-
-
-print(Parse(LoadJson("./clap/clap.json")))
