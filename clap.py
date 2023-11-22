@@ -3,22 +3,15 @@ import json
 from typing import List
 
 
-def IsSameType(name: str, arg: str, config: dict) -> bool:
-    arg_type = GetArgType(arg)
+def IsKnown(arg: str, config: dict) -> bool:
+    name = GetArgName(arg)
+    type = GetArgType(arg)
 
-    if not IsKnown(name, config):
-        print("false")
-        return False
-
-    return arg_type == config["arguments"][name]["type"]
-
-
-def IsKnown(name: str, config: dict) -> bool:
     if "arguments" in config:
         if not name in config["arguments"]:
             return False
         else:
-            return True
+            return type == config["arguments"][name]["type"]
     else:
         return False
 
@@ -54,7 +47,7 @@ def GetArgType(arg: str) -> str:
     if len(arg) <= 1:
         return "command"
 
-    if arg[1] == "-":
+    if arg[1] == "-" and dash_count <= 2:
         return "--"
     elif dash_count == 1:
         return "-"
@@ -75,21 +68,19 @@ def InferrParameters(arg: str, config: dict) -> dict:
     if arg_type == "command":
         return GetVal(arg)
 
-    arg_count = 0
-    if IsSettingSet("default_count", config):
-        arg_count = config["settings"]["default_count"]
+    arg_count = GetSetting("default_count", 0, config)
 
-    return {"name": arg_name, "type": arg_type, "count": arg_count, "inferred": True}
+    return {"name": arg_name, "type": arg_type, "count": arg_count, "known": False}
 
 
 def FindParameters(arg: str, config: dict) -> dict:
     name = arg.replace("-", "")
 
-    if not IsSameType(name, arg, config) or not IsKnown(name, config):
+    if not IsKnown(arg, config):
         return InferrParameters(arg, config)
 
     return {"name": name, "type": config["arguments"][name]["type"],
-            "count": config["arguments"][name]["count"], "inferred": False}
+            "count": config["arguments"][name]["count"], "known": True}
 
 
 def FindArgs(arg_index: int, arguments: List[str], config: dict) -> dict:
@@ -101,32 +92,27 @@ def FindArgs(arg_index: int, arguments: List[str], config: dict) -> dict:
     if IsValue(parameters):
         return parameters
 
-    arg = {"name": GetArgName(
-        arguments[arg_index]), "type": GetArgType(arguments[arg_index]), "args": []}
+    arg = {"name": GetArgName(arguments[arg_index]), "type": GetArgType(
+        arguments[arg_index]), "known": parameters["known"], "args": []}
 
     count = 0
 
     for i in range(1, parameters["count"] + 1):
         if arg_index + i >= len(arguments):
             break
+
         if IsKnown(arguments[arg_index + i], config):
-            arg["args"].append(
-                FindArgs(arg_index + i, arguments, config))
+            arg["args"].append(FindArgs(arg_index + i, arguments, config))
+            count += 1
         else:
             arg["args"].append(GetVal(arguments[arg_index + i]))
             count += 1
 
     for i in range(0, len(arg["args"])):
         if "count" in arg["args"][i]:
-            print(count)
             count += arg["args"][i]["count"]
 
     arg["count"] = count
-
-    if parameters["inferred"]:
-        arg["known"] = False
-    else:
-        arg["known"] = True
 
     return arg
 
@@ -139,55 +125,126 @@ def SplitSegments(segments: str) -> List[str]:
 
     cur = segments.find("-", 0)
 
-    split_segments = []
+    ret = []
 
     while not cur == -1:
         next = segments.find("-", cur + 2)
 
         if next == -1:
-            print(segments[cur:len(segments)])
-            split_segments.append(segments[cur:len(segments)])
+            ret.append(segments[cur:len(segments)])
         else:
-            print(segments[cur:next])
-            split_segments.append(segments[cur:next])
+            ret.append(segments[cur:next])
 
         cur = next
 
-    return split_segments
+    return ret
 
 
-def Match(arg: str, type: str, config: dict) -> List[str]:
-    raise Exception("Match() is not implemented!")
+def ListArgumentsofType(type: str, config: dict) -> List[str]:
+    if not "arguments" in config:
+        return []
+
+    ret = []
+    for key in config["arguments"]:
+        if config["arguments"][key]["type"] == type:
+            ret.append(key)
+
+    return ret
 
 
-def SplitArguments(arg: str, config: dict) -> List[str]:
+def MatchSingle(arg_seg_name: str, config: dict) -> List[str]:
+    ret = []
+
+    while IsKnown("-" + arg_seg_name[0], config):
+        ret.append("-" + arg_seg_name[0])
+        arg_seg_name = arg_seg_name[1:len(arg_seg_name)]
+        if len(arg_seg_name) == 0:
+            break
+
+    if GetSetting("unknown_to_data", False, config) and len(arg_seg_name) > 0:
+        if not len(arg_seg_name) == 0:
+            ret.append(arg_seg_name)
+    elif len(arg_seg_name) > 0:
+        for char in arg_seg_name:
+            ret.append("-" + char)
+
+    return ret
+
+
+def MatchDouble(arg_seg_name: str, config: dict) -> List[str]:
+    ret = []
+
+    arguments = ListArgumentsofType("--", config)
+
+    found = True
+    while len(arg_seg_name) > 0 and found:
+        found = False
+
+        for key in arguments:
+            if len(key) > len(arg_seg_name):
+                continue
+
+            if arg_seg_name[0:len(key)] == key:
+                ret.append("--" + arg_seg_name[0:len(key)])
+                arg_seg_name = arg_seg_name[len(key):len(arg_seg_name)]
+                found = True
+                break
+
+    if len(arg_seg_name) > 0 and GetSetting("unknown_to_data", False, config):
+        ret.append(arg_seg_name)
+    elif len(arg_seg_name) > 0:
+        ret.append("--" + arg_seg_name)
+
+    return ret
+
+
+def MatchCommand(arg_seg_name: str, config: dict) -> List[str]:
+    ret = []
+
+    arguments = ListArgumentsofType("--", config)
+
+    found = True
+    while len(arg_seg_name) > 0 and found:
+        found = False
+
+        for key in arguments:
+            if len(key) > len(arg_seg_name):
+                continue
+
+            if arg_seg_name[0:len(key)] == key:
+                ret.append(arg_seg_name[0:len(key)])
+                arg_seg_name = arg_seg_name[len(key):len(arg_seg_name)]
+                found = True
+                break
+
+    if len(arg_seg_name) > 0:
+        ret.append(arg_seg_name)
+
+    return ret
+
+
+def SplitArgumentSegments(arg: str, config: dict) -> List[str]:
     arg_type = GetArgType(arg)
+    arg_name = GetArgName(arg)
 
     if arg_type == "-":
-        do_match = GetSetting("match-args", False, config)
-
-        if do_match:
-            return Match(arg, arg_type, config)
+        if GetSetting("match-args", False, config):
+            return MatchSingle(arg_name, config)
         else:
-            arg_name = GetArgName(arg)
-            args = []
+            ret = []
 
             for char in arg_name:
-                args.append("-" + char)
+                ret.append("-" + char)
 
-            return args
+            return ret
     elif arg_type == "--":
-        do_match = GetSetting("match--args", False, config)
-
-        if do_match:
-            return Match(arg, arg_type, config)
+        if GetSetting("match--args", False, config):
+            return MatchDouble(arg_name, config)
         else:
             return [arg]
     elif arg_type == "command":
-        do_match = GetSetting("match_command_args", False, config)
-
-        if do_match:
-            return Match(arg, arg_type, config)
+        if GetSetting("match_command_args", False, config):
+            return MatchCommand(arg_name, config)
         else:
             return [arg]
 
@@ -195,37 +252,49 @@ def SplitArguments(arg: str, config: dict) -> List[str]:
 def ProcessArguments(arguments: List[str], config: dict) -> List[str]:
     arguments.pop(0)
 
+    # TODO Fix this ungodly madness (why tf did I do it like this?)
     new_arguments = []
+
     for argument in arguments:
         new_arguments += SplitSegments(argument)
+
     arguments = new_arguments
     new_arguments = []
 
     for argument in arguments:
-        new_arguments += SplitArguments(argument, config)
+        new_arguments += SplitArgumentSegments(argument, config)
     return new_arguments
+
+
+def LoadJson(filename: str) -> dict:
+    file = open(filename, "r")
+    obj = json.load(file)
+    file.close()
+    return obj
 
 
 def Parse(config: dict) -> List[dict]:
     arguments = ProcessArguments(sys.argv, config)
+    print(arguments)
 
     parsed = []
+
     next = 0
 
     while True:
         if next >= len(arguments):
             break
 
-        args = FindArgs(next, arguments, config)
+        arg = FindArgs(next, arguments, config)
 
-        parsed.append(args)
+        parsed.append(arg)
 
-        if "val" in args:
+        if "val" in arg:
             next += 1
         else:
-            next += parsed[len(parsed) - 1]["count"] + 1
+            next += parsed[-1]["count"] + 1
 
     return parsed
 
 
-print(Parse({}))
+print(Parse(LoadJson("./clap/clap.json")))

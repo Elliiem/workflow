@@ -19,14 +19,26 @@
         "p": {
             "type": "-",
             "count": 1
+        },
+        "foo": {
+            "type": "--",
+            "count": 0
+        },
+        "bar": {
+            "type": "--",
+            "count": 0
+        },
+        "G": {
+            "type": "-",
+            "count": 1
         }
     },
     "settings": {
-        "match-args": false,
-        "match--args": false,
+        "match-args": true,
+        "match--args": true,
         "match_command_args": false,
         "match_algorithm": "normal",
-        "unmatched_args_to_data": false,
+        "unknown_to_data": true,
         "default_count": 0
     }
 }
