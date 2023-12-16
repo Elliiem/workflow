@@ -1,0 +1,20 @@
+{
+    "arguments": {
+        "l": {
+            "type": "-",
+            "count": 1
+        },
+        "t": {
+            "type": "-",
+            "count": 1
+        }
+    },
+    "settings": {
+        "match-args": true,
+        "match--args": true,
+        "match_command_args": true,
+        "match_algorithm": "normal",
+        "unknown_to_data": true,
+        "default_count": 0
+    }
+}
