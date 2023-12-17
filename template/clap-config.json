@@ -1,11 +1,12 @@
 {
     "arguments": {
-        "l": {
-            "type": "-",
+        "-l": {
             "count": 1
         },
-        "t": {
-            "type": "-",
+        "-t": {
+            "count": 1
+        },
+        "-o": {
             "count": 1
         }
     },

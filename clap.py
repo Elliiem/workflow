@@ -2,17 +2,37 @@ import sys
 from typing import List
 
 
+class Argument:
+    def __init__(self, arg: str, args) -> None:
+        self.arg = arg
+        self.args = args
+
+
+class ArgumentInfo:
+    def __init__(self, arg: str, count: int, known: bool) -> None:
+        self.arg = arg
+        self.count = count
+        self.known = known
+
+
+class Value:
+    def __init__(self, val: str) -> None:
+        self.value = val.lstrip('-')
+        self.value = self.value.lstrip('~')
+
+        if self.value.isdigit():
+            self.value = int(self.value)
+
+
 def _IsKnown(arg: str, config: dict) -> bool:
     name = _GetArgName(arg)
     type = _GetArgType(arg)
 
     if "arguments" in config:
-        if not name in config["arguments"]:
-            return False
-        else:
-            return type == config["arguments"][name]["type"]
-    else:
-        return False
+        if arg in config["arguments"]:
+            return True
+
+    return False
 
 
 def _IsSettingSet(setting: str, config: dict) -> bool:
@@ -27,13 +47,6 @@ def _GetSetting(setting: str, default: any, config: dict) -> any:
         return config["settings"][setting]
     else:
         return default
-
-
-def _GetValue(val: str) -> dict:
-    if val.lstrip('-').isdigit():
-        return {"type": "number", "val": val}
-
-    return {"type": "string", "val": val}
 
 
 def _GetArgType(arg: str) -> str:
@@ -65,48 +78,42 @@ def _GetArgumentInfo(arg: str, config: dict) -> dict:
     type = _GetArgType(arg)
 
     if type == "data":
-        return {"type": "data", "value": _GetValue(name)}
+        return Value(name)
 
     if not _IsKnown(arg, config):
-        return {"name": name, "type": type, "count": _GetSetting("default_count", 0, config), "known": False}
+        return ArgumentInfo(arg, _GetSetting("default_count", 0, config), False)
     else:
-        arg_conf = config["arguments"][name]
-
-        return {"name": name, "type": arg_conf["type"], "count": arg_conf["count"], "known": True}
+        return ArgumentInfo(arg, config["arguments"][arg]["count"], True)
 
 
 def _FindArgs(arg_index: int, arguments: List[str], config: dict) -> dict:
     if arg_index >= len(arguments):
-        return {}
+        return Argument("", []), 0
 
     info = _GetArgumentInfo(arguments[arg_index], config)
 
-    if info["type"] == "data":
-        return info["value"]
+    if type(info) == Value:
+        return info, 1
 
-    arg = {"name": info["name"], "type": info["type"],
-           "known": info["known"], "args": [], "count": 0}
+    arg = Argument(info.arg, [])
 
     count = 0
 
-    for i in range(1, info["count"] + 1):
+    for i in range(1, info.count + 1):
         if arg_index + i >= len(arguments):
             break
 
         if _IsKnown(arguments[arg_index + i], config):
-            arg["args"].append(_FindArgs(arg_index + i, arguments, config))
-            count += 1
+            arg_r, count_r = _FindArgs(arg_index + i, arguments, config)
+
+            arg.args.append(arg_r)
+
+            count += count_r + 1
         else:
-            arg["args"].append(_GetValue(arguments[arg_index + i]))
-            count += 1
+            arg.args.append(Value(arguments[arg_index + i]))
+            count += 2
 
-    for i in range(0, len(arg["args"])):
-        if "count" in arg["args"][i]:
-            count += arg["args"][i]["count"]
-
-    arg["count"] = count
-
-    return arg
+    return arg, count
 
 
 def _GetCharacterRunLenght(input: str, index: int) -> int:
@@ -158,8 +165,8 @@ def _ListArgumentsofType(type: str, config: dict) -> List[str]:
 
     ret = []
     for key in config["arguments"]:
-        if config["arguments"][key]["type"] == type:
-            ret.append(key)
+        if _GetArgType(key) == type:
+            ret.append(_GetArgName(key))
 
     return ret
 
@@ -279,7 +286,6 @@ def _ProcessArguments(arguments: List[str], config: dict) -> List[str]:
 
 def Parse(config: dict) -> List[dict]:
     arguments = _ProcessArguments(sys.argv, config)
-    print(arguments)
 
     parsed = []
 
@@ -289,13 +295,17 @@ def Parse(config: dict) -> List[dict]:
         if next >= len(arguments):
             break
 
-        arg = _FindArgs(next, arguments, config)
+        arg, count = _FindArgs(next, arguments, config)
+
+        next += count
 
         parsed.append(arg)
 
-        if "val" in arg:
-            next += 1
-        else:
-            next += parsed[-1]["count"] + 1
-
     return parsed
+
+
+def GetValue(val: Value) -> any:
+    if type(val) == Value:
+        return val.value
+    else:
+        return ""
